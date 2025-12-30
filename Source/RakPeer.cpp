@@ -5024,19 +5024,19 @@ namespace RakNet
 									delete [] data;
 							}
 						}
-						else
+						else if (data[0] == (unsigned char)ID_CONNECTION_LOST)
 						{
-							if (data[0]>=(unsigned char)ID_RPC)
-							{
-								packet=AllocPacket(byteSize, data);
-								packet->bitSize = bitSize;
-								packet->playerId = playerId;
-								packet->playerIndex = ( PlayerIndex ) remoteSystemIndex;
-								AddPacketToProducer(packet);					
-							}
-							//else
-								// Some internal type got returned to the user?
-								//RakAssert(0);
+							// Do nothing - packet is received through network.
+							// This shouldn't happen as it's an internal packet.
+							delete[] data;
+						}
+						else if (data[0] >= (unsigned char)ID_RPC)
+						{
+							packet = AllocPacket(byteSize, data);
+							packet->bitSize = bitSize;
+							packet->playerId = playerId;
+							packet->playerIndex = (PlayerIndex)remoteSystemIndex;
+							AddPacketToProducer(packet);
 						}
 					}
 
