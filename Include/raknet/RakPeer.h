@@ -558,6 +558,7 @@ namespace RakNet
 		///When we get a connection request from an ip / port, accept it unless full
 		void OnConnectionRequest( RakPeer::RemoteSystemStruct *remoteSystem, unsigned char *AESKey, bool setAESKey );
 		void AcceptConnectionRequest(RakPeer::RemoteSystemStruct* remoteSystem);
+		void SecuredConnectionResponse( const PlayerID playerId, const TransportAddress &transportAddress );
 		///Send a reliable disconnect packet to this player and disconnect them when it is delivered
 		void NotifyAndFlagForDisconnect( const PlayerID playerId, bool performImmediate, unsigned char orderingChannel );
 		///Returns how many remote systems initiated a connection to us
