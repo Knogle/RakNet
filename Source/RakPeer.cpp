@@ -4558,7 +4558,11 @@ namespace RakNet
 					}
 				}
 
-				remoteSystem->reliabilityLayer.Update( connectionSocket, playerId, MTUSize, timeNS, messageHandlerList ); // playerId only used for the internet simulator test
+				SOCKET sendSocket = connectionSocket;
+				if (remoteSystem->transportAddress.IsIPv6() && connectionSocketV6 != INVALID_SOCKET)
+					sendSocket = connectionSocketV6;
+
+				remoteSystem->reliabilityLayer.Update( sendSocket, playerId, remoteSystem->transportAddress, MTUSize, timeNS, messageHandlerList ); // playerId only used for plugin callbacks and legacy bookkeeping
 
 				// Check for failure conditions
 				if ( remoteSystem->reliabilityLayer.IsDeadConnection() ||
