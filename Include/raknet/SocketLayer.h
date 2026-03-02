@@ -55,6 +55,8 @@ namespace RakNet
 		bool IsValid(void) const;
 		bool IsIPv4(void) const;
 		bool IsIPv6(void) const;
+		bool operator==(const TransportAddress &right) const;
+		bool operator!=(const TransportAddress &right) const;
 		unsigned int ToIPv4Binary(void) const;
 		bool ToSockaddr(sockaddr_storage *storage, socklen_t *len) const;
 		static TransportAddress FromSockaddr(const sockaddr *sa, socklen_t len);

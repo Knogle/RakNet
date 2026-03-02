@@ -137,6 +137,23 @@ bool TransportAddress::IsIPv6(void) const
 	return addressFamily == AF_INET6;
 }
 
+bool TransportAddress::operator==(const TransportAddress &right) const
+{
+	if (addressFamily != right.addressFamily || port != right.port || scopeId != right.scopeId)
+		return false;
+
+	if (IsIPv4())
+		return memcmp(address, right.address, 4) == 0;
+	if (IsIPv6())
+		return memcmp(address, right.address, 16) == 0;
+	return IsValid() == false && right.IsValid() == false;
+}
+
+bool TransportAddress::operator!=(const TransportAddress &right) const
+{
+	return (*this == right) == false;
+}
+
 unsigned int TransportAddress::ToIPv4Binary(void) const
 {
 	unsigned int binaryAddress;
