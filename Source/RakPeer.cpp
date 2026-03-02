@@ -63,6 +63,21 @@
 
 using namespace RakNet;
 
+namespace
+{
+TransportAddress PlayerIDToTransportAddress(const PlayerID &playerId)
+{
+	TransportAddress transportAddress;
+	if (playerId == UNASSIGNED_PLAYER_ID)
+		return transportAddress;
+
+	transportAddress.addressFamily = AF_INET;
+	transportAddress.port = playerId.port;
+	memcpy(transportAddress.address, &playerId.binaryAddress, sizeof(playerId.binaryAddress));
+	return transportAddress;
+}
+}
+
 #ifdef _MSC_VER
 #pragma warning( push )
 #endif
@@ -2680,6 +2695,30 @@ RakPeer::RemoteSystemStruct *RakPeer::GetRemoteSystemFromPlayerID( const PlayerI
 
 	return 0;
 }
+
+RakPeer::RemoteSystemStruct *RakPeer::GetRemoteSystemFromTransportAddress( const TransportAddress &transportAddress, bool onlyActive ) const
+{
+	int deadConnectionIndex = -1;
+
+	if (transportAddress.IsValid() == false || remoteSystemList == 0)
+		return 0;
+
+	for ( unsigned short i = 0; i < maximumNumberOfPeers; ++i )
+	{
+		if (remoteSystemList[ i ].transportAddress == transportAddress)
+		{
+			if (remoteSystemList[ i ].isActive)
+				return remoteSystemList + i;
+			if (deadConnectionIndex == -1)
+				deadConnectionIndex = i;
+		}
+	}
+
+	if (deadConnectionIndex != -1 && onlyActive == false)
+		return remoteSystemList + deadConnectionIndex;
+
+	return 0;
+}
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct *remoteSystem, PlayerID playerId, const char *data, int byteSize )
 {
@@ -2862,6 +2901,7 @@ RakPeer::RemoteSystemStruct * RakPeer::AssignPlayerIDToRemoteSystemList( const P
 			remoteSystem=remoteSystemList+i;
 			remoteSystem->rpcMap.Clear();
 			remoteSystem->playerId = playerId;
+			remoteSystem->transportAddress = PlayerIDToTransportAddress(playerId);
 			remoteSystem->isActive=true; // This one line causes future incoming packets to go through the reliability layer
 			remoteSystem->reliabilityLayer.SetSplitMessageProgressInterval(splitMessageProgressInterval);
 			remoteSystem->reliabilityLayer.SetUnreliableTimeout(unreliableTimeout);

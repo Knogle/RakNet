@@ -499,6 +499,7 @@ namespace RakNet
 		{
 			bool isActive; /// Is this structure in use?
 			PlayerID playerId;  /// The remote system associated with this reliability layer
+			TransportAddress transportAddress; /// The transport address associated with this reliability layer
 			PlayerID myExternalPlayerId;  /// Your own IP, as reported by the remote system
 			ReliabilityLayer reliabilityLayer;  /// The reliability layer associated with this player
 			bool weInitiatedTheConnection; /// True if we started this connection via Connect.  False if someone else connected to us.
@@ -547,6 +548,7 @@ namespace RakNet
 		/// \param[in] playerID The player identifier 
 		/// \return 0 if none
 		RemoteSystemStruct *GetRemoteSystemFromPlayerID( const PlayerID playerID, bool calledFromNetworkThread, bool onlyActive) const;
+		RemoteSystemStruct *GetRemoteSystemFromTransportAddress( const TransportAddress &transportAddress, bool onlyActive ) const;
 		///Parse out a connection request packet
 		void ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct *remoteSystem, PlayerID playerId, const char *data, int byteSize);
 		bool ParseConnectionAuthPacket(RakPeer::RemoteSystemStruct* remoteSystem, PlayerID playerId, unsigned char* data, int byteSize);
