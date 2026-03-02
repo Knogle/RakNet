@@ -61,8 +61,10 @@ namespace RakNet
 {
 	#ifdef _WIN32
 	extern void __stdcall ProcessNetworkPacket( const unsigned int binaryAddress, const unsigned short port, const char *data, const int length, RakPeer *rakPeer );
+	extern void __stdcall ProcessNetworkPacket( const TransportAddress &transportAddress, const char *data, const int length, RakPeer *rakPeer );
 	#else
 	extern void ProcessNetworkPacket( const unsigned int binaryAddress, const unsigned short port, const char *data, const int length, RakPeer *rakPeer );
+	extern void ProcessNetworkPacket( const TransportAddress &transportAddress, const char *data, const int length, RakPeer *rakPeer );
 	#endif
 
 	#ifdef _WIN32
@@ -569,24 +571,23 @@ int SocketLayer::RecvFrom( const SOCKET s, RakPeer *rakPeer, int *errorCode, Tra
 			return 1;
 		}
 
-		if (packetSender.IsIPv4() == false)
-		{
-#ifdef _DEBUG
-			char ipString[INET6_ADDRSTRLEN];
-			if (packetSender.IsIPv6() && inet_ntop(AF_INET6, packetSender.address, ipString, sizeof(ipString)))
-				SAMPRakNet::GetCore()->printLn("Dropping unsupported IPv6 packet from [%s]:%u.", ipString, packetSender.port);
-#endif
-			return 1;
-		}
-
 		uint8_t* decrypted = SAMPRakNet::Decrypt((uint8_t*)data, len);
 		if (decrypted) {
-			ProcessNetworkPacket(packetSender.ToIPv4Binary(), packetSender.port, (char*)decrypted, len - 1, rakPeer);
+			ProcessNetworkPacket(packetSender, (char*)decrypted, len - 1, rakPeer);
 		}
 #ifdef _DEBUG
 		else {
-			uint8_t* const addr = reinterpret_cast<uint8_t*>(packetSender.address);
-			SAMPRakNet::GetCore()->printLn("Dropping bad packet from %u.%u.%u.%u:%u!", addr[0], addr[1], addr[2], addr[3], packetSender.port);
+			if (packetSender.IsIPv4())
+			{
+				uint8_t* const addr = reinterpret_cast<uint8_t*>(packetSender.address);
+				SAMPRakNet::GetCore()->printLn("Dropping bad packet from %u.%u.%u.%u:%u!", addr[0], addr[1], addr[2], addr[3], packetSender.port);
+			}
+			else if (packetSender.IsIPv6())
+			{
+				char ipString[INET6_ADDRSTRLEN];
+				if (inet_ntop(AF_INET6, packetSender.address, ipString, sizeof(ipString)))
+					SAMPRakNet::GetCore()->printLn("Dropping bad packet from [%s]:%u!", ipString, packetSender.port);
+			}
 		}
 #endif
 		return 1;
