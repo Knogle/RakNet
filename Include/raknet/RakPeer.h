@@ -527,11 +527,13 @@ namespace RakNet
 		// friend unsigned __stdcall RecvFromNetworkLoop(LPVOID arguments);
 		friend void __stdcall ProcessPortUnreachable( const unsigned int binaryAddress, const unsigned short port, RakPeer *rakPeer );
 		friend void __stdcall ProcessNetworkPacket( const unsigned int binaryAddress, const unsigned short port, const char *data, const int length, RakPeer *rakPeer );
+		friend void __stdcall ProcessNetworkPacket( const TransportAddress &transportAddress, const char *data, const int length, RakPeer *rakPeer );
 		friend unsigned __stdcall UpdateNetworkLoop( LPVOID arguments );
 	#else
 		// friend void*  RecvFromNetworkLoop( void*  arguments );
 		friend void ProcessPortUnreachable( const unsigned int binaryAddress, const unsigned short port, RakPeer *rakPeer );
 		friend void ProcessNetworkPacket( const unsigned int binaryAddress, const unsigned short port, const char *data, const int length, RakPeer *rakPeer );
+		friend void ProcessNetworkPacket( const TransportAddress &transportAddress, const char *data, const int length, RakPeer *rakPeer );
 		friend void* UpdateNetworkLoop( void* arguments );
 	#endif
 

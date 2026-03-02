@@ -3953,6 +3953,57 @@ namespace RakNet
 		return false;
 	}
 
+	void ProcessNetworkPacket( const TransportAddress &transportAddress, const char *data, const int length, RakPeer *rakPeer )
+	{
+		if (transportAddress.IsIPv4())
+		{
+			ProcessNetworkPacket(transportAddress.ToIPv4Binary(), transportAddress.port, data, length, rakPeer);
+			return;
+		}
+
+		if (transportAddress.IsIPv6() == false)
+			return;
+
+		RakPeer::RemoteSystemStruct *remoteSystem = rakPeer->GetRemoteSystemFromTransportAddress(transportAddress, true);
+		if (remoteSystem == 0)
+			return;
+
+		bool shouldBanPeer = false;
+		PlayerID playerId = remoteSystem->playerId;
+
+		if (remoteSystem->connectMode==RakPeer::RemoteSystemStruct::SET_ENCRYPTION_ON_MULTIPLE_16_BYTE_PACKET &&
+#if RAKNET_LEGACY
+			(length%8)==0
+#else
+			(length%16)==0
+#endif
+			)
+		{
+			remoteSystem->reliabilityLayer.SetEncryptionKey( remoteSystem->AESKey );
+		}
+
+		if (remoteSystem->reliabilityLayer.HandleSocketReceiveFromConnectedPlayer(data, length, playerId, rakPeer->messageHandlerList, rakPeer->MTUSize, shouldBanPeer) == false)
+		{
+			Packet* packet = AllocPacket(1);
+			packet->data[0] = ID_MODIFIED_PACKET;
+			packet->bitSize = sizeof(char) * 8;
+			packet->playerId = playerId;
+			packet->playerIndex = (PlayerIndex) rakPeer->GetIndexFromPlayerID(playerId, true);
+			rakPeer->AddPacketToProducer(packet);
+		}
+
+		if (shouldBanPeer)
+		{
+			Packet* packet = AllocPacket(sizeof(char));
+			packet->data[0] = ID_DISCONNECTION_NOTIFICATION;
+			packet->bitSize = sizeof(char) * 8;
+			packet->playerId = playerId;
+			packet->playerIndex = (PlayerIndex) rakPeer->GetIndexFromPlayerID(playerId, true);
+			rakPeer->AddPacketToProducer(packet);
+			rakPeer->CloseConnectionInternal(playerId, false, true, 0);
+		}
+	}
+
 	// --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	#ifdef _WIN32
 	void __stdcall ProcessNetworkPacket( const unsigned int binaryAddress, const unsigned short port, const char *data, const int length, RakPeer *rakPeer )
