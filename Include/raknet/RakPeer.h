@@ -754,9 +754,10 @@ namespace RakNet
 		int threadSleepTimer;
 
 		SOCKET connectionSocket;
-	#if defined (_WIN32) && defined(USE_WAIT_FOR_MULTIPLE_EVENTS)
-		WSAEVENT recvEvent;
-	#endif
+		SOCKET connectionSocketV6;
+		#if defined (_WIN32) && defined(USE_WAIT_FOR_MULTIPLE_EVENTS)
+			WSAEVENT recvEvent;
+		#endif
 
 		// Used for RPC replies
 		RakNet::BitStream *replyFromTargetBS;

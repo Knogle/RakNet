@@ -172,6 +172,7 @@ RakPeer::RakPeer()
 	rawBytesSent = rawBytesReceived = compressedBytesSent = compressedBytesReceived = 0;
 	outputTree = inputTree = 0;
 	connectionSocket = INVALID_SOCKET;
+	connectionSocketV6 = INVALID_SOCKET;
 	MTUSize = DEFAULT_MTU_SIZE;
 	trackFrequencyTable = false;
 	maximumIncomingConnections = 0;
@@ -186,6 +187,7 @@ RakPeer::RakPeer()
 	// isRecvfromThreadActive=false;
 	occasionalPing = false;
 	connectionSocket = INVALID_SOCKET;
+	connectionSocketV6 = INVALID_SOCKET;
 	myPlayerId = UNASSIGNED_PLAYER_ID;
 	allowConnectionResponseIPMigration = false;
 	blockOnRPCReply=false;
@@ -256,6 +258,12 @@ bool RakPeer::Initialize( unsigned short maxConnections, unsigned short localPor
 		unsigned short localPort2 = SocketLayer::Instance()->GetLocalPort(connectionSocket);
 		if (localPort2!=0)
 			localPort=localPort2;
+	}
+
+	if ( connectionSocketV6 == INVALID_SOCKET )
+	{
+		SocketBindParameters bindParameters(localPort, true, AF_INET6, true, 0);
+		connectionSocketV6 = SocketLayer::Instance()->CreateBoundSocket(bindParameters);
 	}
 
 #if defined (_WIN32) && defined(USE_WAIT_FOR_MULTIPLE_EVENTS)
@@ -735,6 +743,12 @@ void RakPeer::Disconnect( unsigned int blockDuration, unsigned char orderingChan
 	{
 		closesocket( connectionSocket );
 		connectionSocket = INVALID_SOCKET;
+	}
+
+	if ( connectionSocketV6 != INVALID_SOCKET )
+	{
+		closesocket( connectionSocketV6 );
+		connectionSocketV6 = INVALID_SOCKET;
 	}
 
 	ClearBufferedCommands();
@@ -4305,6 +4319,10 @@ namespace RakNet
 		{
 			// Read a packet
 			gotData = SocketLayer::Instance()->RecvFrom( connectionSocket, this, &errorCode );
+			if (gotData != 1 && connectionSocketV6 != INVALID_SOCKET)
+			{
+				gotData = SocketLayer::Instance()->RecvFrom( connectionSocketV6, this, &errorCode );
+			}
 
 			if ( gotData == SOCKET_ERROR )
 			{
