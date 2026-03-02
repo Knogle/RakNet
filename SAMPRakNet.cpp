@@ -348,7 +348,7 @@ SAMPRakNet::
 }
 
 void SAMPRakNet::
-    HandleQuery(SOCKET instance, int outsize, const sockaddr_in& client, char const* buf, int insize)
+    HandleQuery(SOCKET instance, int outsize, const sockaddr_storage& client, char const* buf, int insize)
 {
     if (query_ == nullptr) {
         return;

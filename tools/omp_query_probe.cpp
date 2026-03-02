@@ -23,16 +23,26 @@ namespace
 {
 	void PrintUsage()
 	{
-		std::fprintf(stderr, "Usage: omp_query_probe <host> <port> [opcode]\n");
+		std::fprintf(stderr, "Usage: omp_query_probe <family> <host> <port> [opcode]\n");
+		std::fprintf(stderr, "  family: ipv4 | ipv6\n");
 		std::fprintf(stderr, "  opcode: i (server info, default), o, c, r, p\n");
 	}
 
-	bool ResolveIPv4(const char* host, const char* port, sockaddr_in* output)
+	int ParseFamily(const char* value)
+	{
+		if (std::strcmp(value, "ipv4") == 0)
+			return AF_INET;
+		if (std::strcmp(value, "ipv6") == 0)
+			return AF_INET6;
+		return AF_UNSPEC;
+	}
+
+	bool ResolveAddress(const char* host, const char* port, int family, sockaddr_storage* output, socklen_t* outputLen)
 	{
 		addrinfo hints;
 		addrinfo* result = 0;
 		std::memset(&hints, 0, sizeof(hints));
-		hints.ai_family = AF_INET;
+		hints.ai_family = family;
 		hints.ai_socktype = SOCK_DGRAM;
 
 		const int rc = getaddrinfo(host, port, &hints, &result);
@@ -45,9 +55,11 @@ namespace
 		bool ok = false;
 		for (addrinfo* it = result; it; it = it->ai_next)
 		{
-			if (it->ai_family == AF_INET && it->ai_addrlen >= (socklen_t)sizeof(sockaddr_in))
+			if (it->ai_family == family)
 			{
-				std::memcpy(output, it->ai_addr, sizeof(sockaddr_in));
+				std::memset(output, 0, sizeof(sockaddr_storage));
+				std::memcpy(output, it->ai_addr, (size_t)it->ai_addrlen);
+				*outputLen = (socklen_t)it->ai_addrlen;
 				ok = true;
 				break;
 			}
@@ -75,15 +87,21 @@ int main(int argc, char** argv)
 		return 1;
 #endif
 
-	if (argc < 3 || argc > 4)
+	if (argc < 4 || argc > 5)
 	{
 		PrintUsage();
 		return 1;
 	}
 
-	const char* host = argv[1];
-	const char* portString = argv[2];
-	const char opcode = argc == 4 ? argv[3][0] : 'i';
+	const int family = ParseFamily(argv[1]);
+	const char* host = argv[2];
+	const char* portString = argv[3];
+	const char opcode = argc == 5 ? argv[4][0] : 'i';
+	if (family == AF_UNSPEC)
+	{
+		std::fprintf(stderr, "invalid family: %s\n", argv[1]);
+		return 1;
+	}
 	const unsigned short port = ParsePort(portString);
 	if (port == 0)
 	{
@@ -91,28 +109,44 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	sockaddr_in target;
-	if (!ResolveIPv4(host, portString, &target))
+	sockaddr_storage target;
+	socklen_t targetLen = 0;
+	if (!ResolveAddress(host, portString, family, &target, &targetLen))
 		return 1;
 
-	unsigned char request[15];
-	std::memcpy(request, "SAMP", 4);
-	std::memcpy(request + 4, &target.sin_addr.s_addr, 4);
-	request[8] = (unsigned char)(port & 0xFF);
-	request[9] = (unsigned char)((port >> 8) & 0xFF);
-	request[10] = (unsigned char)opcode;
-	int requestLength = 11;
+	unsigned char request[32];
+	int requestLength;
+	if (family == AF_INET6)
+	{
+		const sockaddr_in6* ipv6 = reinterpret_cast<const sockaddr_in6*>(&target);
+		std::memcpy(request, "SAMP6", 5);
+		std::memcpy(request + 5, &ipv6->sin6_addr, 16);
+		request[21] = (unsigned char)(port & 0xFF);
+		request[22] = (unsigned char)((port >> 8) & 0xFF);
+		request[23] = (unsigned char)opcode;
+		requestLength = 24;
+	}
+	else
+	{
+		const sockaddr_in* ipv4 = reinterpret_cast<const sockaddr_in*>(&target);
+		std::memcpy(request, "SAMP", 4);
+		std::memcpy(request + 4, &ipv4->sin_addr.s_addr, 4);
+		request[8] = (unsigned char)(port & 0xFF);
+		request[9] = (unsigned char)((port >> 8) & 0xFF);
+		request[10] = (unsigned char)opcode;
+		requestLength = 11;
+	}
 
 	if (opcode == 'p')
 	{
-		request[11] = 0x78;
-		request[12] = 0x56;
-		request[13] = 0x34;
-		request[14] = 0x12;
-		requestLength = 15;
+		request[requestLength + 0] = 0x78;
+		request[requestLength + 1] = 0x56;
+		request[requestLength + 2] = 0x34;
+		request[requestLength + 3] = 0x12;
+		requestLength += 4;
 	}
 
-	SOCKET socketFd = socket(AF_INET, SOCK_DGRAM, 0);
+	SOCKET socketFd = socket(family, SOCK_DGRAM, 0);
 	if (socketFd == INVALID_SOCKET)
 	{
 #ifdef _WIN32
@@ -133,7 +167,7 @@ int main(int argc, char** argv)
 	setsockopt(socketFd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 #endif
 
-	if (sendto(socketFd, reinterpret_cast<const char*>(request), requestLength, 0, reinterpret_cast<const sockaddr*>(&target), sizeof(target)) == SOCKET_ERROR)
+	if (sendto(socketFd, reinterpret_cast<const char*>(request), requestLength, 0, reinterpret_cast<const sockaddr*>(&target), targetLen) == SOCKET_ERROR)
 	{
 #ifdef _WIN32
 		std::fprintf(stderr, "sendto failed: %d\n", WSAGetLastError());
@@ -158,7 +192,11 @@ int main(int argc, char** argv)
 	}
 
 	std::printf("received %d bytes for opcode %c\n", received, opcode);
-	if (received >= 11)
+	if (received >= 24 && std::memcmp(response, "SAMP6", 5) == 0)
+	{
+		std::printf("magic=%.5s opcode=%c\n", response, response[23]);
+	}
+	else if (received >= 11)
 	{
 		std::printf("magic=%.4s opcode=%c\n", response, response[10]);
 	}
