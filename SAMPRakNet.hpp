@@ -142,7 +142,7 @@ public:
 	static uint32_t GetToken() { return token_; }
 	static void SeedToken() { token_ = rand(); }
 
-	static void HandleQuery(SOCKET instance, int outsize, const sockaddr_in& client, char const* buf, int insize);
+	static void HandleQuery(SOCKET instance, int outsize, const sockaddr_storage& client, char const* buf, int insize);
 
 	static Pair<uint8_t, StringView> GenerateAuth();
 	static bool CheckAuth(uint8_t index, StringView auth);

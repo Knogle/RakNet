@@ -564,10 +564,10 @@ int SocketLayer::RecvFrom( const SOCKET s, RakPeer *rakPeer, int *errorCode, Tra
 		if (sender)
 			*sender = packetSender;
 
-		if (len > 10 && data[0] == 'S' && data[1] == 'A' && data[2] == 'M' && data[3] == 'P')
+		if ((len > 10 && data[0] == 'S' && data[1] == 'A' && data[2] == 'M' && data[3] == 'P' && data[4] != '6') ||
+			(len > 23 && data[0] == 'S' && data[1] == 'A' && data[2] == 'M' && data[3] == 'P' && data[4] == '6'))
 		{
-			if (packetSender.IsIPv4())
-				SAMPRakNet::HandleQuery(s, len2, *reinterpret_cast<sockaddr_in*>(&sa), data, len);
+			SAMPRakNet::HandleQuery(s, len2, sa, data, len);
 			return 1;
 		}
 
