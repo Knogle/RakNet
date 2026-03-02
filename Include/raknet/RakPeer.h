@@ -519,6 +519,7 @@ namespace RakNet
 		};
 
 		unsigned short GetNumberOfUnverifiedInstances(const unsigned int binaryAddress);
+		unsigned short GetNumberOfUnverifiedInstances(const TransportAddress &transportAddress);
 		unsigned short GetNumberOfActivePeers();
 
 	protected:
