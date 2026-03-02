@@ -65,6 +65,24 @@ using namespace RakNet;
 
 namespace
 {
+void UpdateSynCookieHash(CSHA1 &sha1, const TransportAddress &transportAddress, const PlayerID &playerId, const unsigned char (&randomNumber)[20])
+{
+	sha1.Reset();
+	if (transportAddress.IsIPv6())
+	{
+		sha1.Update((unsigned char*)transportAddress.address, 16);
+		sha1.Update((unsigned char*)&transportAddress.port, sizeof(transportAddress.port));
+		sha1.Update((unsigned char*)&transportAddress.scopeId, sizeof(transportAddress.scopeId));
+	}
+	else
+	{
+		sha1.Update((unsigned char*)&playerId.binaryAddress, sizeof(playerId.binaryAddress));
+		sha1.Update((unsigned char*)&playerId.port, sizeof(playerId.port));
+	}
+	sha1.Update((unsigned char*)&randomNumber, 20);
+	sha1.Final();
+}
+
 TransportAddress PlayerIDToTransportAddress(const PlayerID &playerId)
 {
 	TransportAddress transportAddress;
@@ -2822,7 +2840,7 @@ void RakPeer::ParseConnectionRequestPacket( RakPeer::RemoteSystemStruct *remoteS
 			}
 #if !defined(_COMPATIBILITY_1)
 			else
-				SecuredConnectionResponse( playerId );
+				SecuredConnectionResponse( playerId, remoteSystem->transportAddress );
 #endif
 		}
 		else
@@ -3401,6 +3419,11 @@ void RakPeer::GenerateSYNCookieRandomNumber( void )
 // --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 void RakPeer::SecuredConnectionResponse( const PlayerID playerId )
 {
+	SecuredConnectionResponse(playerId, PlayerIDToTransportAddress(playerId));
+}
+
+void RakPeer::SecuredConnectionResponse( const PlayerID playerId, const TransportAddress &transportAddress )
+{
 #if !defined(_COMPATIBILITY_1)
 	CSHA1 sha1;
 	RSA_BIT_SIZE n;
@@ -3413,11 +3436,7 @@ void RakPeer::SecuredConnectionResponse( const PlayerID playerId )
 
 	// Hash the SYN-Cookie
 	// s2c syn-cookie = SHA1_HASH(source ip address + source port + random number)
-	sha1.Reset();
-	sha1.Update( ( unsigned char* ) & playerId.binaryAddress, sizeof( playerId.binaryAddress ) );
-	sha1.Update( ( unsigned char* ) & playerId.port, sizeof( playerId.port ) );
-	sha1.Update( ( unsigned char* ) & ( newRandomNumber ), 20 );
-	sha1.Final();
+	UpdateSynCookieHash(sha1, transportAddress, playerId, newRandomNumber);
 
 	// Write the cookie
 	memcpy( connectionRequestResponse + 1, sha1.GetHash(), 20 );
@@ -4995,7 +5014,7 @@ namespace RakNet
 								playerId==myPlayerId) // local system connect
 							{
 
-								SAMPRakNet::SetRequestingConnection(playerId.binaryAddress, false);
+								SAMPRakNet::SetRequestingConnection(remoteSystem->transportAddress, false);
 
 								remoteSystem->connectMode=RemoteSystemStruct::CONNECTED;
 								PingInternal( playerId, true );
@@ -5144,11 +5163,7 @@ namespace RakNet
 
 							// Hash the SYN-Cookie
 							// s2c syn-cookie = SHA1_HASH(source ip address + source port + random number)
-							sha1.Reset();
-							sha1.Update( ( unsigned char* ) & playerId.binaryAddress, sizeof( playerId.binaryAddress ) );
-							sha1.Update( ( unsigned char* ) & playerId.port, sizeof( playerId.port ) );
-							sha1.Update( ( unsigned char* ) & ( newRandomNumber ), 20 );
-							sha1.Final();
+							UpdateSynCookieHash(sha1, remoteSystem->transportAddress, playerId, newRandomNumber);
 
 							// Confirm if
 							//syn-cookie ?= HASH(source ip address + source port + last random number)
@@ -5159,11 +5174,7 @@ namespace RakNet
 							}
 							else
 							{
-								sha1.Reset();
-								sha1.Update( ( unsigned char* ) & playerId.binaryAddress, sizeof( playerId.binaryAddress ) );
-								sha1.Update( ( unsigned char* ) & playerId.port, sizeof( playerId.port ) );
-								sha1.Update( ( unsigned char* ) & ( oldRandomNumber ), 20 );
-								sha1.Final();
+								UpdateSynCookieHash(sha1, remoteSystem->transportAddress, playerId, oldRandomNumber);
 
 								if ( memcmp( sha1.GetHash(), data + 1, 20 ) == 0 )
 									confirmedHash = true;
